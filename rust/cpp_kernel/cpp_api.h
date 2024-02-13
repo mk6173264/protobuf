@@ -34,14 +34,17 @@ extern "C" struct SerializedData {
   SerializedData(const char* data, size_t len) : data(data), len(len) {}
 };
 
-// Allocates memory using the current Rust global allocator.
+// Allocates 1-aligned memory using the current Rust global allocator.
 //
 // This function is defined in `rust_alloc_for_cpp_api.rs`.
-extern "C" void* __pb_rust_alloc(size_t size, size_t align);
+extern "C" void* __pb_rust_alloc_align1(size_t size);
 
 inline SerializedData SerializeMsg(const google::protobuf::Message* msg) {
   size_t len = msg->ByteSizeLong();
-  void* bytes = __pb_rust_alloc(len, alignof(char));
+  void* bytes = __pb_rust_alloc_align1(len);
+  if (bytes == nullptr) {
+    ABSL_LOG(FATAL) << "Rust allocator failed to allocate memory.";
+  }
   if (!msg->SerializeToArray(bytes, static_cast<int>(len))) {
     ABSL_LOG(FATAL) << "Couldn't serialize the message.";
   }
